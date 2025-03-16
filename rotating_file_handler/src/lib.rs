@@ -10,7 +10,7 @@
 //! use std::fs;
 //!
 //! fn main() -> std::io::Result<()> {
-//!     let mut handler = RotatingFileHandler::new("docs_log.txt", 1024, 3)?;
+//!     let mut handler = RotatingFileHandler::new("docs_log.txt", 1024, 3, None)?;
 //!     handler.emit(b"Hello, world!")?;
 //!     handler.emit(b"Logging some more data...")?;
 //!     fs::remove_file("docs_log.txt");
@@ -20,6 +20,7 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::{self, Write};
+use std::option::Option;
 use std::path::Path;
 
 /// A handler for rotating log files.
@@ -32,6 +33,7 @@ pub struct RotatingFileHandler {
     backup_count: usize,
     current_size: u64,
     file: File,
+    header: Option<Vec<u8>>,
 }
 
 impl RotatingFileHandler {
@@ -42,15 +44,30 @@ impl RotatingFileHandler {
     /// * `base_path` - The base path of the log file.
     /// * `max_bytes` - The maximum size of the log file in bytes before it rotates.
     /// * `backup_count` - The number of backup files to keep.
+    /// * `header` - An optional header to write to the log file.
     ///
     /// # Returns
     ///
     /// An `io::Result` containing the new `RotatingFileHandler` or an error.
-    pub fn new(base_path: &str, max_bytes: u64, backup_count: usize) -> io::Result<Self> {
-        let file = OpenOptions::new()
+    pub fn new(
+        base_path: &str,
+        max_bytes: u64,
+        backup_count: usize,
+        header: Option<Vec<u8>>,
+    ) -> io::Result<Self> {
+        let mut file = OpenOptions::new()
             .append(true)
             .create(true)
             .open(base_path)?;
+        if let Some(ref header) = header {
+            if header.len() as u64 > max_bytes {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Header size exceeds maximum file size",
+                ));
+            }
+            file.write_all(header)?;
+        }
         let current_size = file.metadata()?.len();
         Ok(Self {
             base_path: base_path.to_string(),
@@ -58,6 +75,7 @@ impl RotatingFileHandler {
             backup_count,
             current_size,
             file,
+            header,
         })
     }
 
@@ -79,6 +97,9 @@ impl RotatingFileHandler {
             .append(true)
             .create(true)
             .open(&self.base_path)?; // Create a new log file.
+        if let Some(ref header) = self.header {
+            self.file.write_all(header)?; // Write the header to the new log file.
+        }
         self.current_size = 0; // Reset the current size.
         Ok(())
     }
@@ -105,15 +126,27 @@ impl RotatingFileHandler {
     }
 }
 
+impl Write for RotatingFileHandler {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.emit(buf)?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.file.flush()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
+    use std::io::Write;
 
     /// Test that the log file rotates when the maximum file size is reached.
     #[test]
     fn test_rotation_on_max_file_size() {
-        let mut handler = RotatingFileHandler::new("test_case_1_log.txt", 10, 3).unwrap();
+        let mut handler = RotatingFileHandler::new("test_case_1_log.txt", 10, 3, None).unwrap();
 
         // Emit data to reach the maximum file size but not exceed it.
         handler.emit(b"12345").unwrap();
@@ -143,7 +176,7 @@ mod tests {
     /// Test that the log file rotates when the maximum backup count is reached.
     #[test]
     fn test_rotation_on_max_count() {
-        let mut handler = RotatingFileHandler::new("test_case_2_log.txt", 10, 2).unwrap();
+        let mut handler = RotatingFileHandler::new("test_case_2_log.txt", 10, 2, None).unwrap();
         handler.emit(b"1234567890").unwrap();
         handler.emit(b"abcdefghij").unwrap(); // This should trigger a rotation.
         handler.emit(b"klmnopqrst").unwrap(); // This should trigger a rotation.
@@ -172,7 +205,7 @@ mod tests {
     /// Test that the `emit` method writes data to the log file.
     #[test]
     fn test_emit() {
-        let mut handler = RotatingFileHandler::new("test_case_3_log.txt", 50, 1).unwrap();
+        let mut handler = RotatingFileHandler::new("test_case_3_log.txt", 50, 1, None).unwrap();
         handler.emit(b"Hello, world!").unwrap();
         handler.emit(b" More data.").unwrap();
 
@@ -180,5 +213,18 @@ mod tests {
         assert_eq!(content, "Hello, world! More data.");
 
         let _ = fs::remove_file("test_case_3_log.txt");
+    }
+
+    /// Test that the `write` method writes data to the log file.
+    #[test]
+    fn test_write_trait() {
+        let mut handler = RotatingFileHandler::new("test_case_4_log.txt", 50, 1, None).unwrap();
+        write!(handler, "Hello, world!").unwrap();
+        write!(handler, " More data.").unwrap();
+
+        let content = fs::read_to_string("test_case_4_log.txt").unwrap();
+        assert_eq!(content, "Hello, world! More data.");
+
+        let _ = fs::remove_file("test_case_4_log.txt");
     }
 }

@@ -1,0 +1,16 @@
+[package]
+name = "mavlink_logger"
+version = "0.1.0"
+edition = "2024"
+authors = [
+    "Wesley Murray",
+]
+description = "Implements a simple mavlink logger."
+repository = "https://github.com/flocked-agriculture/mavlink_utils"
+readme ="./README.md"
+license = "MIT/Apache-2.0"
+
+[dependencies]
+uuid = { version = "1.15.1", features = ["v4"] }
+rotating_file_handler = { path = "../rotating_file_handler", default-features = false }
+mavlink = "0.13.1"
