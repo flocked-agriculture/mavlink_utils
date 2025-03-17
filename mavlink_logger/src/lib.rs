@@ -1,10 +1,10 @@
-//! # Mavlink Logger
-//! The `mavlink_logger` crate provides a simple interface for logging mavlink messages to a file.
 #![crate_name = "mavlink_logger"]
-#![doc = include_str!("../docs/file_management.md")]
-#![doc = include_str!("../docs/file_format.md")]
+#![doc = include_str!("../README.md")]
+#![doc = include_str!("../docs/home.md")]
+#![doc = include_str!("../docs/mav_log_file_format.md")]
+#![doc = include_str!("../docs/tlog_file_format.md")]
 
-#[cfg(feature = "MavLogger")]
+#[cfg(feature = "MavLog")]
 pub mod rotating_mav_logger;
 
 #[cfg(feature = "Tlog")]

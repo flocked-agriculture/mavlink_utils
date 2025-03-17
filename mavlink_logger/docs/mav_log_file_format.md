@@ -1,8 +1,16 @@
-# File Format
+# Mav Log File Format
+
+This document describes a log file format for log data centered around mavlink but where some flexibility might be needed. It includes a header to support that flexibility.
+
+## Overview
 
 On log file creation, the file header as specified below should be written. After the header is the mavlink message definitions. The mavlink message definitions can be captured via one of the formats captured in [Mavlink Definition Payload Type](#mavlink-definition-payload-type-enum). After the header, any number of entries can be added. This file can contain any data. Each entry into the file will have a header and payload.
 
 It is expected that endianness match the mavlink spec for [pack format](https://mavlink.io/en/guide/serialization.html#packet_format) (little-endian).
+
+## File Extension
+
+".mav" is strongly encouraged. ".bin" should be supported.
 
 ## Sections
 

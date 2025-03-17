@@ -17,8 +17,8 @@ mavlink = { version = "0.13.1", default-features = false }
 
 [features]
 Experimental = [] # place holder for any feature development that is experimental. effectively a feature flag.
-MavLogger = ["mavlink/default"]
+MavLog = ["mavlink/default"]
 Tlog = ["mavlink/default"]
-all = ["MavLogger", "Tlog"]
-default = ["MavLogger"]
+all = ["MavLog", "Tlog"]
+default = ["MavLog"]
 # TODO: there is more configurability available for mavlink but we only include scope that has been tested
