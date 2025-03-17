@@ -4,7 +4,10 @@
 #![doc = include_str!("../docs/file_management.md")]
 #![doc = include_str!("../docs/file_format.md")]
 
+#[cfg(feature = "MavLogger")]
 pub mod rotating_mav_logger;
+
+#[cfg(feature = "Tlog")]
 pub mod rotating_tlog;
 
 use mavlink::{MavFrame, Message};

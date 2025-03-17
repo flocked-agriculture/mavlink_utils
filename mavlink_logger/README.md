@@ -13,7 +13,5 @@ Simple rotating file logging system.
 
 ## Future Work
 
-- pass through features to the mavlink crate
-- use rust features to select between .tlog and .mav loggers
 - use rust features to select for certain optimizations such as no timestamps or mavlink only
 - add support for logging in embedded systems

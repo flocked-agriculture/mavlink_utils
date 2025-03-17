@@ -13,4 +13,12 @@ license = "MIT/Apache-2.0"
 [dependencies]
 uuid = { version = "1.15.1", features = ["v4"] }
 rotating_file_handler = { path = "../rotating_file_handler", default-features = false }
-mavlink = "0.13.1"
+mavlink = { version = "0.13.1", default-features = false }
+
+[features]
+Experimental = [] # place holder for any feature development that is experimental. effectively a feature flag.
+MavLogger = ["mavlink/default"]
+Tlog = ["mavlink/default"]
+all = ["MavLogger", "Tlog"]
+default = ["MavLogger"]
+# TODO: there is more configurability available for mavlink but we only include scope that has been tested
