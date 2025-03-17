@@ -14,4 +14,5 @@ Simple rotating file logging system.
 ## Future Work
 
 - use rust features to select for certain optimizations such as no timestamps or mavlink only
+- support no copy logging if possible and necessary
 - add support for logging in embedded systems
