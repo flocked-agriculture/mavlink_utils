@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
-
 use std::convert::TryInto;
+
 use uuid::Uuid;
 
 /// Struct representing format flags for the log file.
@@ -35,7 +35,7 @@ pub enum MavlinkDefinitionPayloadType {
     /// No payload. Use MAVLink main XML definition as default.
     None = 0,
     /// UTF-8 encoded comma delimited URLs for XML files.
-    Utf8CommaDelimitedUrlsForXMLFiles = 1,
+    Utf8SpaceDelimitedUrlsForXMLFiles = 1,
     /// UTF-8 encoded XML.
     Utf8Xml = 2,
 }
@@ -46,7 +46,7 @@ impl TryFrom<u16> for MavlinkDefinitionPayloadType {
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(MavlinkDefinitionPayloadType::None),
-            1 => Ok(MavlinkDefinitionPayloadType::Utf8CommaDelimitedUrlsForXMLFiles),
+            1 => Ok(MavlinkDefinitionPayloadType::Utf8SpaceDelimitedUrlsForXMLFiles),
             2 => Ok(MavlinkDefinitionPayloadType::Utf8Xml),
             _ => Err(()),
         }
@@ -73,13 +73,15 @@ pub struct MavlinkMessageDefinition {
 
 impl MavlinkMessageDefinition {
     pub fn unpack(packed_data: &[u8; 46]) -> Self {
+        // stop at the first null byte when unpacking a string
+        let end_dialect_ind: usize = match packed_data[8..40].iter().position(|&x| x == 0) {
+            Some(index) => index + 8,
+            None => 40,
+        };
         MavlinkMessageDefinition {
             version_major: u32::from_le_bytes(packed_data[0..4].try_into().unwrap()),
             version_minor: u32::from_le_bytes(packed_data[4..8].try_into().unwrap()),
-            dialect: match String::from_utf8(packed_data[8..40].to_vec()) {
-                Ok(v) => v.trim_end().to_string(),
-                Err(_e) => "".to_string(),
-            },
+            dialect: String::from_utf8(packed_data[8..end_dialect_ind].to_vec()).unwrap(),
             payload_type: u16::from_le_bytes(packed_data[40..42].try_into().unwrap())
                 .try_into()
                 .unwrap(),
@@ -90,7 +92,7 @@ impl MavlinkMessageDefinition {
 
     pub fn unpack_payload(&mut self, packed_data: &[u8]) {
         match self.payload_type {
-            MavlinkDefinitionPayloadType::Utf8CommaDelimitedUrlsForXMLFiles => {
+            MavlinkDefinitionPayloadType::Utf8SpaceDelimitedUrlsForXMLFiles => {
                 self.payload = Some(packed_data.to_vec());
             }
             MavlinkDefinitionPayloadType::Utf8Xml => {
@@ -122,11 +124,14 @@ pub struct FileHeader {
 
 impl FileHeader {
     pub fn unpack(packed_data: &[u8; 108]) -> Self {
-        let mut src_application_id = match String::from_utf8(packed_data[24..56].to_vec()) {
+        let id_end: usize = match packed_data[24..56].iter().position(|&x| x == 0) {
+            Some(index) => index + 24,
+            None => 56,
+        };
+        let src_application_id: String = match String::from_utf8(packed_data[24..id_end].to_vec()) {
             Ok(v) => v,
             Err(_e) => "".to_string(),
         };
-        src_application_id = src_application_id.trim_end().to_string();
 
         FileHeader {
             uuid: Uuid::from_bytes(packed_data[0..16].try_into().unwrap()),
@@ -178,7 +183,7 @@ mod tests {
         );
         assert_eq!(
             MavlinkDefinitionPayloadType::try_from(1).unwrap(),
-            MavlinkDefinitionPayloadType::Utf8CommaDelimitedUrlsForXMLFiles
+            MavlinkDefinitionPayloadType::Utf8SpaceDelimitedUrlsForXMLFiles
         );
         assert_eq!(
             MavlinkDefinitionPayloadType::try_from(2).unwrap(),
@@ -205,43 +210,47 @@ mod tests {
         assert_eq!(definition.size, 0);
         assert!(definition.payload.is_none());
 
-        let packed_data: [u8; 46] = [
+        let mut packed_data: [u8; 46] = [
             1, 0, 0, 2, // version_major
             2, 0, 0, 1, // version_minor
-            b't', b'e', b's', b't', 0, b'1', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, // dialect
+            b't', b'e', b's', b't', b' ', b'1', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, // dialect
             1, 0, // payload_type
-            0, 255, 0, 0, // size
+            0, 0, 0, 0, // size
         ];
-        let urls_str: String = String::from("http://example.com,http://example.2.com");
-        urls_str.as_bytes().to_vec();
-        let definition = MavlinkMessageDefinition::unpack(&packed_data);
+        let urls_str: String = String::from("http://example.com http://example.2.com");
+        let encoded_urls: &[u8] = urls_str.as_bytes();
+        packed_data[42..46].copy_from_slice(&(encoded_urls.len() as u32).to_le_bytes());
+        let mut definition = MavlinkMessageDefinition::unpack(&packed_data);
         assert_eq!(definition.version_major, 0x02000001);
         assert_eq!(definition.version_minor, 0x01000002);
         assert_eq!(definition.dialect, "test 1");
         assert_eq!(
             definition.payload_type,
-            MavlinkDefinitionPayloadType::Utf8CommaDelimitedUrlsForXMLFiles
+            MavlinkDefinitionPayloadType::Utf8SpaceDelimitedUrlsForXMLFiles
         );
-        assert_eq!(definition.size, 0x00ff0000);
+        assert_eq!(definition.size, encoded_urls.len() as u32);
         assert!(definition.payload.is_none());
+        definition.unpack_payload(encoded_urls);
+        assert_eq!(definition.payload, Some(encoded_urls.to_vec()));
     }
 
     #[test]
     fn test_file_header_unpack() {
         let packed_data: [u8; 108] = [
-            // uuid
-            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, // timestamp_us
-            16, 0, 0, 0, 0, 0, 0, 0, // src_application_id
+            // file header
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, // uuid
+            16, 0, 0, 0, 0, 0, 0, 17, // timestamp_us
             b'a', b'p', b'p', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, // format_version
-            1, 0, 0, 0, // format_flags
-            3, 0, // message_definition
-            1, 0, 0, 0, // version_major
-            2, 0, 0, 0, // version_minor
+            0, 0, 0, 0, 0, 0, // src_application_id
+            1, 0, 0, 2, // format_version
+            3, 4, // format_flags
+            // message_definition
+            4, 0, 0, 5, // version_major
+            6, 0, 0, 7, // version_minor
             b't', b'e', b's', b't', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, // dialect
-            1, 0, // payload_type
+            2, 0, // payload_type
             10, 0, 0, 0, // size
         ];
         let header = FileHeader::unpack(&packed_data);
@@ -249,17 +258,17 @@ mod tests {
             header.uuid,
             Uuid::from_bytes([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
         );
-        assert_eq!(header.timestamp_us, 16);
+        assert_eq!(header.timestamp_us, 0x1100000000000010);
         assert_eq!(header.src_application_id, "app");
-        assert_eq!(header.format_version, 1);
+        assert_eq!(header.format_version, 0x02000001);
         assert!(header.format_flags.mavlink_only);
         assert!(header.format_flags.not_timestamped);
-        assert_eq!(header.message_definition.version_major, 1);
-        assert_eq!(header.message_definition.version_minor, 2);
+        assert_eq!(header.message_definition.version_major, 0x05000004);
+        assert_eq!(header.message_definition.version_minor, 0x07000006);
         assert_eq!(header.message_definition.dialect, "test");
         assert_eq!(
             header.message_definition.payload_type,
-            MavlinkDefinitionPayloadType::Utf8CommaDelimitedUrlsForXMLFiles
+            MavlinkDefinitionPayloadType::Utf8Xml
         );
         assert_eq!(header.message_definition.size, 10);
         assert!(header.message_definition.payload.is_none());

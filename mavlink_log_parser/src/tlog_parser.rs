@@ -8,7 +8,7 @@ pub struct TlogParser<M: Message> {
 }
 
 impl<M: Message> TlogParser<M> {
-    pub fn new(file_path: &str) -> Self {
+    pub fn new<M: Message>(file_path: &str) -> Self {
         let connection_string = format!("file:{}", file_path);
         let vehicle =
             mavlink::connect::<M>(&connection_string).expect("An invalid file path was provided");
