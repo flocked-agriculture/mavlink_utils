@@ -52,11 +52,11 @@ This is a bitmask meaning each entry should double the previous.
 
 This determines what information will be provided in the payload field for the MAVLink messages definitions.
 
-| Value | Name                 | Description                                                                                 |
-| :---- | :------------------- | :------------------------------------------------------------------------------------------ |
-| 0     | NONE                 | No message definitions are provided.                                                        |
-| 1     | COMMA_DELIMITED_URLS | A UTF-8 encoded string as a set of comma separated urls pointing to the relevant XML files. |
-| 2     | XML                  | UTF-8 encoded XML definitions.                                                              |
+| Value | Name                 | Description                                                                                      |
+| :---- | :------------------- | :----------------------------------------------------------------------------------------------- |
+| 0     | NONE                 | No message definitions are provided.                                                             |
+| 1     | SPACE_DELIMITED_URLS | A UTF-8 encoded string as a set of whitespace separated urls pointing to the relevant XML files. |
+| 2     | XML                  | UTF-8 encoded XML definitions.                                                                   |
 
 ## Entries (0-11 bytes without payload)
 
