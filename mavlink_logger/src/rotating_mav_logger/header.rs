@@ -64,7 +64,7 @@ pub enum MavlinkDefinitionPayloadType {
     /// No payload. Use MAVLink main XML definition as default.
     None = 0,
     /// UTF-8 encoded comma delimited URLs for XML files.
-    Utf8CommaDelimitedUrlsForXMLFiles = 1,
+    Utf8SpaceDelimitedUrlsForXMLFiles = 1,
     /// UTF-8 encoded XML.
     Utf8Xml = 2,
 }
