@@ -30,5 +30,5 @@ impl<M: Message> Default for LogEntry<M> {
 }
 
 pub trait MavParser<M: Message> {
-    fn next(&mut self) -> Result<Option<LogEntry<M>>, MessageReadError>;
+    fn next(&mut self) -> Result<LogEntry<M>, MessageReadError>;
 }
