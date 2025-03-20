@@ -247,7 +247,10 @@ mod tests {
         // Verify the file header
         assert_eq!(&content[0..16], logger.header.uuid.as_bytes());
         assert_eq!(content[16..24], logger.header.timestamp_us.to_le_bytes());
-        assert_eq!(content[24..56], FileHeader::SRC_APPLICATION_ID);
+        assert_eq!(
+            String::from_utf8(content[24..56].to_vec()).unwrap(),
+            "mavlink_logger\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+        );
         assert_eq!(
             content[56..60],
             FileHeader::FILE_FORMAT_VERSION.to_le_bytes()
@@ -415,7 +418,6 @@ mod tests {
         }
 
         // Verify mixed entries
-        const MIXED_ENTRY_SIZE: usize = 49;
         for _ in 0..2 {
             assert_eq!(content[pointer], 1); // type
             assert_eq!(content[pointer + 1..pointer + 3], [21, 0]); // payload size

@@ -1,4 +1,3 @@
-use std::fmt;
 use std::time::SystemTime;
 
 use uuid::Uuid;
@@ -40,19 +39,6 @@ impl FormatFlags {
     }
 }
 
-impl fmt::Display for FormatFlags {
-    /// Formats the `FormatFlags` for display.
-    ///
-    /// This method provides a human-readable representation of the `FormatFlags`.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            " Mavlink Only: {}\n Not Timestamped: {}",
-            self.mavlink_only, self.not_timestamped
-        )
-    }
-}
-
 /// Enum representing the payload type for MAVLink message definitions.
 ///
 /// `MavlinkDefinitionPayloadType` specifies the type of payload used to identify message definitions.
@@ -77,8 +63,8 @@ pub struct MavlinkMessageDefinition {
     pub version_major: u32,
     /// MAVLink protocol minor version number.
     pub version_minor: u32,
-    /// UTF-8 encoded string identifying mavlink dialect.
-    pub dialect: [u8; 32], // needs to be packed into a c-type char array of len 32
+    /// UTF-8 string identifying mavlink dialect.
+    pub dialect: String, // needs to be packed into a c-type char array of len 32
     /// Type of payload used to identify message definition.
     pub payload_type: MavlinkDefinitionPayloadType,
     /// Size of message definition payload in bytes.
@@ -89,7 +75,7 @@ pub struct MavlinkMessageDefinition {
 
 impl MavlinkMessageDefinition {
     /// Default dialect for MAVLink message definitions.
-    pub const DEFAULT_DIALECT: [u8; 32] = *b"common                          ";
+    pub const DEFAULT_DIALECT: &str = "common";
 
     /// Packs the `MavlinkMessageDefinition` into a vector of bytes.
     ///
@@ -103,10 +89,14 @@ impl MavlinkMessageDefinition {
     ///
     /// A `Vec<u8>` containing the packed byte representation of the `MavlinkMessageDefinition`.
     pub fn pack(&self) -> Vec<u8> {
+        assert!(self.dialect.len() <= 32, "dialect must be 32 bytes or less");
+        let mut dialect_bytes = [0u8; 32];
+        dialect_bytes[..self.dialect.len()].copy_from_slice(self.dialect.as_bytes());
+
         let mut packed: Vec<u8> = Vec::new();
         packed.extend_from_slice(&self.version_major.to_le_bytes());
         packed.extend_from_slice(&self.version_minor.to_le_bytes());
-        packed.extend_from_slice(&self.dialect);
+        packed.extend_from_slice(&dialect_bytes);
         let payload_type: u16 = self.payload_type as u16;
         packed.extend_from_slice(&payload_type.to_le_bytes());
         packed.extend_from_slice(&self.size.to_le_bytes());
@@ -126,7 +116,7 @@ impl Default for MavlinkMessageDefinition {
         MavlinkMessageDefinition {
             version_major: 2,
             version_minor: 0,
-            dialect: MavlinkMessageDefinition::DEFAULT_DIALECT,
+            dialect: String::from(MavlinkMessageDefinition::DEFAULT_DIALECT),
             payload_type: MavlinkDefinitionPayloadType::None,
             size: 0,
             payload: Vec::new(),
@@ -143,8 +133,8 @@ pub struct FileHeader {
     pub uuid: Uuid,
     /// The system unix timestamp in microseconds when the logger was initialized.
     pub timestamp_us: u64,
-    /// UTF-8 encoded string identifying the application used to generate the log file.
-    pub src_application_id: [u8; 32], // needs to be packed into a c-type char array of len 32
+    /// UTF-8 string identifying the application used to generate the log file.
+    pub src_application_id: String, // needs to be packed into a c-type char array of len 32
     /// A format version number. This is to allow compatability detection for future changes to the log file format.
     pub format_version: u32,
     /// A struct inidicating optional log file format changes.
@@ -159,7 +149,7 @@ impl FileHeader {
     /// Currently supported file format version.
     pub const FILE_FORMAT_VERSION: u32 = 1;
     /// Default source application ID.
-    pub const SRC_APPLICATION_ID: [u8; 32] = *b"mavlink_logger                  ";
+    pub const SRC_APPLICATION_ID: &str = "mavlink_logger";
 
     /// Creates a new `FileHeader` with the provided format flags and message definition.
     ///
@@ -186,7 +176,7 @@ impl FileHeader {
         FileHeader {
             uuid: Uuid::new_v4(),
             timestamp_us,
-            src_application_id: FileHeader::SRC_APPLICATION_ID,
+            src_application_id: String::from(FileHeader::SRC_APPLICATION_ID),
             format_version: FileHeader::FILE_FORMAT_VERSION,
             format_flags,
             message_definition,
@@ -207,10 +197,18 @@ impl FileHeader {
     /// # Returns
     /// A `Vec<u8>` containing the packed representation of the `FileHeader`.
     pub fn pack(&self) -> Vec<u8> {
+        assert!(
+            self.src_application_id.len() <= 32,
+            "src_application_id must be 32 bytes or less"
+        );
+        let mut app_id_bytes = [0u8; 32];
+        app_id_bytes[..self.src_application_id.len()]
+            .copy_from_slice(self.src_application_id.as_bytes());
+
         let mut packed: Vec<u8> = Vec::new();
         packed.extend_from_slice(self.uuid.as_bytes());
         packed.extend_from_slice(&self.timestamp_us.to_le_bytes());
-        packed.extend_from_slice(&self.src_application_id);
+        packed.extend_from_slice(&app_id_bytes);
         packed.extend_from_slice(&self.format_version.to_le_bytes());
         packed.extend_from_slice(&self.format_flags.pack());
         packed.extend_from_slice(&self.message_definition.pack());
@@ -233,24 +231,11 @@ impl Default for FileHeader {
         FileHeader {
             uuid: Uuid::new_v4(),
             timestamp_us,
-            src_application_id: FileHeader::SRC_APPLICATION_ID,
+            src_application_id: String::from(FileHeader::SRC_APPLICATION_ID),
             format_version: FileHeader::FILE_FORMAT_VERSION,
             format_flags: FormatFlags::default(),
             message_definition: MavlinkMessageDefinition::default(),
         }
-    }
-}
-
-impl fmt::Display for FileHeader {
-    /// Formats the `FileHeader` for display.
-    ///
-    /// This method provides a human-readable representation of the `FileHeader`.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "UUID: {}\nTimestamp: {}\nFormat Version: {}\nFlags: \n{}",
-            self.uuid, self.timestamp_us, self.format_version, self.format_flags
-        )
     }
 }
 
@@ -304,7 +289,7 @@ mod tests {
         let definition = MavlinkMessageDefinition {
             version_major: 2,
             version_minor: 0,
-            dialect: MavlinkMessageDefinition::DEFAULT_DIALECT,
+            dialect: String::from(MavlinkMessageDefinition::DEFAULT_DIALECT),
             payload_type: MavlinkDefinitionPayloadType::None,
             size: 0,
             payload: Vec::new(),
@@ -313,14 +298,17 @@ mod tests {
         assert_eq!(packed.len(), 46);
         assert_eq!(&packed[0..4], &[2, 0, 0, 0]);
         assert_eq!(&packed[4..8], &[0, 0, 0, 0]);
-        assert_eq!(&packed[8..40], &MavlinkMessageDefinition::DEFAULT_DIALECT);
+        assert_eq!(
+            String::from_utf8(packed[8..40].to_vec()).unwrap(),
+            "common\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+        );
         assert_eq!(&packed[40..42], &[0, 0]);
         assert_eq!(&packed[42..46], &[0, 0, 0, 0]);
 
         let definition = MavlinkMessageDefinition {
             version_major: 0x01020304,
             version_minor: 0x04050607,
-            dialect: MavlinkMessageDefinition::DEFAULT_DIALECT,
+            dialect: String::from(MavlinkMessageDefinition::DEFAULT_DIALECT),
             payload_type: MavlinkDefinitionPayloadType::Utf8Xml,
             size: 5,
             payload: b"hello".to_vec(),
@@ -329,7 +317,10 @@ mod tests {
         assert_eq!(packed.len(), 51);
         assert_eq!(&packed[0..4], &[4, 3, 2, 1]);
         assert_eq!(&packed[4..8], &[7, 6, 5, 4]);
-        assert_eq!(&packed[8..40], &MavlinkMessageDefinition::DEFAULT_DIALECT);
+        assert_eq!(
+            String::from_utf8(packed[8..40].to_vec()).unwrap(),
+            "common\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+        );
         assert_eq!(&packed[40..42], &[2, 0]);
         assert_eq!(&packed[42..46], &[5, 0, 0, 0]);
         assert_eq!(&packed[46..51], b"hello");
@@ -353,7 +344,7 @@ mod tests {
         let message_definition = MavlinkMessageDefinition {
             version_major: 2,
             version_minor: 0,
-            dialect: MavlinkMessageDefinition::DEFAULT_DIALECT,
+            dialect: String::from(MavlinkMessageDefinition::DEFAULT_DIALECT),
             payload_type: MavlinkDefinitionPayloadType::Utf8Xml,
             size: 5,
             payload: b"hello".to_vec(),
@@ -362,7 +353,10 @@ mod tests {
         let packed = header.pack();
         assert_eq!(packed.len(), 113);
         assert_eq!(&packed[16..24], &header.timestamp_us.to_le_bytes()); // timestamp
-        assert_eq!(&packed[24..56], &FileHeader::SRC_APPLICATION_ID); // src application id
+        assert_eq!(
+            String::from_utf8(packed[24..56].to_vec()).unwrap(),
+            "mavlink_logger\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+        ); // src application id
         assert_eq!(&packed[56..60], &[1, 0, 0, 0]); // file version
         assert_eq!(&packed[60..62], &[1, 0]); // format flags
         assert_eq!(&packed[62..113], &header.message_definition.pack()[..]);
