@@ -1,6 +1,14 @@
 //! # Rotating File Handler
 //!
-//! A simple rotating file handler for logging generic binary data.
+//! A simple rotating file handler for logging generic binary data. It works by providing a base
+//! file name such a `log.txt`, a maximum file size in bytes, and a number of backup files to keep.
+//! When the log file reaches the maximum size, it rotates the log files by renaming the existing
+//! files containing the base name. It does so by adding a suffix with a number starting from `0`.
+//! If the file name already has a suffix, it increments the number by `1` up to the limit of the
+//! specified backup count.
+//!
+//! Example: base=log.txt max_bytes=1024 backup_count=3
+//! log.txt -> log.txt.0 -> log.txt.1 -> log.txt.2
 //!
 //! Example usage of the `RotatingFileHandler`.
 //!

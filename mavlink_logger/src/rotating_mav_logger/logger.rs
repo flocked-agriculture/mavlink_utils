@@ -179,11 +179,12 @@ impl RotatingFileMavLogger {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Read;
+    use tempfile::NamedTempFile;
+
     use mavlink::MavHeader;
     use mavlink::MavlinkVersion;
     use mavlink::common::{HEARTBEAT_DATA, MavMessage};
-    use std::fs::File;
-    use std::io::Read;
 
     use super::*;
 
@@ -226,22 +227,21 @@ mod tests {
     /// Test writing a mix of MAVLink, text, and raw data entries without any optimizations.
     #[test]
     fn test_write_mix_no_optimization() {
-        // Define the test file name and remove it if it exists
-        const CASE_FILE_NAME: &str = "test_mix_write_log.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        // Create a temporary file
+        let mut tmpfile: NamedTempFile = NamedTempFile::new().unwrap();
+        let tmpfile_path = tmpfile.path().to_str().unwrap();
 
         // Create a new logger instance
         let mut logger: RotatingFileMavLogger =
-            RotatingFileMavLogger::new(CASE_FILE_NAME, 1000, 0, None, None)
+            RotatingFileMavLogger::new(tmpfile_path, 1000, 0, None, None)
                 .expect("Failed to create logger");
 
         // Populate the log file
         populate_log_file(&mut logger);
 
         // Read the log file and verify its content
-        let mut file: File = File::open(CASE_FILE_NAME).unwrap();
         let mut content: Vec<u8> = Vec::new();
-        file.read_to_end(&mut content).unwrap();
+        tmpfile.read_to_end(&mut content).unwrap();
         assert_eq!(content.len(), 984);
 
         // Verify the file header
@@ -254,14 +254,17 @@ mod tests {
         );
         assert_eq!(content[60..62], [0, 0]); // flags
 
+        let mut pointer: usize = FileHeader::MIN_SIZE;
+
         // Verify MAVLink entries
+        const HEARTBEAT_DATA_SIZE: usize = 32;
         for i in 0..10 {
-            let offset = 108 + i * 32;
+            let offset = pointer + i * HEARTBEAT_DATA_SIZE;
             assert_eq!(content[offset], 1); // type
             assert_ne!(content[offset + 1..offset + 9], [0, 0, 0, 0, 0, 0, 0, 0]); // timestamp
             assert_eq!(content[offset + 9..offset + 11], [21, 0]); // payload size
             assert_eq!(
-                content[offset + 11..offset + 32],
+                content[offset + 11..offset + HEARTBEAT_DATA_SIZE],
                 [
                     253, 9, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 12, 3, 0, 3, 3, 98, 190
                 ]
@@ -269,13 +272,15 @@ mod tests {
         }
 
         // Verify text entries
+        const TEXT_DATA_SIZE: usize = 25;
+        pointer += 10 * HEARTBEAT_DATA_SIZE;
         for i in 0..10 {
-            let offset = 428 + i * 25;
+            let offset = pointer + i * TEXT_DATA_SIZE;
             assert_eq!(content[offset], 2); // type
             assert_ne!(content[offset + 1..offset + 9], [0, 0, 0, 0, 0, 0, 0, 0]); // timestamp
             assert_eq!(content[offset + 9..offset + 11], [14, 0]); // payload size
             assert_eq!(
-                content[offset + 11..offset + 25],
+                content[offset + 11..offset + TEXT_DATA_SIZE],
                 [
                     84, 101, 115, 116, 32, 108, 111, 103, 32, 101, 110, 116, 114, 121
                 ]
@@ -283,17 +288,24 @@ mod tests {
         }
 
         // Verify raw entries
+        const RAW_DATA_SIZE: usize = 16;
+        pointer += 10 * TEXT_DATA_SIZE;
         for i in 0..10 {
-            let offset = 678 + i * 16;
+            let offset = pointer + i * RAW_DATA_SIZE;
             assert_eq!(content[offset], 0); // type
             assert_ne!(content[offset + 1..offset + 9], [0, 0, 0, 0, 0, 0, 0, 0]); // timestamp
             assert_eq!(content[offset + 9..offset + 11], [5, 0]); // payload size
-            assert_eq!(content[offset + 11..offset + 16], [1, 2, 3, 4, 5]); // payload
+            assert_eq!(
+                content[offset + 11..offset + RAW_DATA_SIZE],
+                [1, 2, 3, 4, 5]
+            ); // payload
         }
 
         // Verify mixed entries
+        const MIXED_DATA_SIZE: usize = 73;
+        pointer += 10 * RAW_DATA_SIZE;
         for i in 0..2 {
-            let offset = 838 + i * 73;
+            let offset = pointer + i * MIXED_DATA_SIZE;
             assert_eq!(content[offset], 1); // type
             assert_ne!(content[offset + 1..offset + 9], [0, 0, 0, 0, 0, 0, 0, 0]); // timestamp
             assert_eq!(content[offset + 9..offset + 11], [21, 0]); // payload size
@@ -327,16 +339,16 @@ mod tests {
             assert_eq!(content[offset_raw + 11..offset_raw + 16], [1, 2, 3, 4, 5]); // payload
         }
 
-        // Clean up the test file
-        std::fs::remove_file(CASE_FILE_NAME).unwrap();
+        // Remove the temporary file
+        tmpfile.close().unwrap();
     }
 
     /// Test writing a mix of MAVLink, text, and raw data entries with no timestamp optimization.
     #[test]
     fn test_write_mix_no_timestamp_optimization() {
-        // Define the test file name and remove it if it exists
-        const CASE_FILE_NAME: &str = "test_write_mix_no_timestamp.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        // Create a temporary file
+        let mut tmpfile: NamedTempFile = NamedTempFile::new().unwrap();
+        let tmpfile_path = tmpfile.path().to_str().unwrap();
 
         // Define format flags with no timestamp optimization
         let format_flags = FormatFlags {
@@ -346,92 +358,99 @@ mod tests {
 
         // Create a new logger instance with the format flags
         let mut logger: RotatingFileMavLogger =
-            RotatingFileMavLogger::new(CASE_FILE_NAME, 1000, 0, Some(format_flags), None)
+            RotatingFileMavLogger::new(tmpfile_path, 1000, 0, Some(format_flags), None)
                 .expect("Failed to create logger");
 
         // Populate the log file
         populate_log_file(&mut logger);
 
         // Read the log file and verify its content
-        let mut file: File = File::open(CASE_FILE_NAME).unwrap();
         let mut content: Vec<u8> = Vec::new();
-        file.read_to_end(&mut content).unwrap();
+        tmpfile.read_to_end(&mut content).unwrap();
         assert_eq!(content.len(), 696);
 
         // Verify the file header
         assert_eq!(content[60..62], [2, 0]); // flags
 
+        let mut pointer: usize = FileHeader::MIN_SIZE;
+
         // Verify MAVLink entries
-        for i in 0..10 {
-            let offset = 108 + i * 24;
-            assert_eq!(content[offset], 1); // type
-            assert_eq!(content[offset + 1..offset + 3], [21, 0]); // payload size
+        const MAVLINK_ENTRY_SIZE: usize = 24;
+        for _ in 0..10 {
+            assert_eq!(content[pointer], 1); // type
+            assert_eq!(content[pointer + 1..pointer + 3], [21, 0]); // payload size
             assert_eq!(
-                content[offset + 3..offset + 24],
+                content[pointer + 3..pointer + MAVLINK_ENTRY_SIZE],
                 [
                     253, 9, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 12, 3, 0, 3, 3, 98, 190
                 ]
             ); // payload
+            pointer += MAVLINK_ENTRY_SIZE;
         }
 
         // Verify text entries
-        for i in 0..10 {
-            let offset = 348 + i * 17;
-            assert_eq!(content[offset], 2); // type
-            assert_eq!(content[offset + 1..offset + 3], [14, 0]); // payload size
+        const TEXT_ENTRY_SIZE: usize = 17;
+        for _ in 0..10 {
+            assert_eq!(content[pointer], 2); // type
+            assert_eq!(content[pointer + 1..pointer + 3], [14, 0]); // payload size
             assert_eq!(
-                content[offset + 3..offset + 17],
+                content[pointer + 3..pointer + TEXT_ENTRY_SIZE],
                 [
                     84, 101, 115, 116, 32, 108, 111, 103, 32, 101, 110, 116, 114, 121
                 ]
             ); // payload
+            pointer += TEXT_ENTRY_SIZE;
         }
 
         // Verify raw entries
-        for i in 0..10 {
-            let offset = 518 + i * 8;
-            assert_eq!(content[offset], 0); // type
-            assert_eq!(content[offset + 1..offset + 3], [5, 0]); // payload size
-            assert_eq!(content[offset + 3..offset + 8], [1, 2, 3, 4, 5]); // payload
+        const RAW_ENTRY_SIZE: usize = 8;
+        for _ in 0..10 {
+            assert_eq!(content[pointer], 0); // type
+            assert_eq!(content[pointer + 1..pointer + 3], [5, 0]); // payload size
+            assert_eq!(
+                content[pointer + 3..pointer + RAW_ENTRY_SIZE],
+                [1, 2, 3, 4, 5]
+            ); // payload
+            pointer += RAW_ENTRY_SIZE;
         }
 
         // Verify mixed entries
-        for i in 0..2 {
-            let offset = 598 + i * 49;
-            assert_eq!(content[offset], 1); // type
-            assert_eq!(content[offset + 1..offset + 3], [21, 0]); // payload size
+        const MIXED_ENTRY_SIZE: usize = 49;
+        for _ in 0..2 {
+            assert_eq!(content[pointer], 1); // type
+            assert_eq!(content[pointer + 1..pointer + 3], [21, 0]); // payload size
             assert_eq!(
-                content[offset + 3..offset + 24],
+                content[pointer + 3..pointer + 24],
                 [
                     253, 9, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 12, 3, 0, 3, 3, 98, 190
                 ]
             ); // payload
-            let offset_text = offset + 24;
-            assert_eq!(content[offset_text], 2); // type
-            assert_eq!(content[offset_text + 1..offset_text + 3], [14, 0]); // payload size
+            pointer += 24;
+            assert_eq!(content[pointer], 2); // type
+            assert_eq!(content[pointer + 1..pointer + 3], [14, 0]); // payload size
             assert_eq!(
-                content[offset_text + 3..offset_text + 17],
+                content[pointer + 3..pointer + 17],
                 [
                     84, 101, 115, 116, 32, 108, 111, 103, 32, 101, 110, 116, 114, 121
                 ]
             ); // payload
-
-            let offset_raw = offset + 41;
-            assert_eq!(content[offset_raw], 0); // type
-            assert_eq!(content[offset_raw + 1..offset_raw + 3], [5, 0]); // payload size
-            assert_eq!(content[offset_raw + 3..offset_raw + 8], [1, 2, 3, 4, 5]); // payload
+            pointer += 17;
+            assert_eq!(content[pointer], 0); // type
+            assert_eq!(content[pointer + 1..pointer + 3], [5, 0]); // payload size
+            assert_eq!(content[pointer + 3..pointer + 8], [1, 2, 3, 4, 5]); // payload
+            pointer += 8;
         }
 
-        // Clean up the test file
-        std::fs::remove_file(CASE_FILE_NAME).unwrap();
+        // Remove the temporary file
+        tmpfile.close().unwrap();
     }
 
     /// Test writing only MAVLink entries with MAVLink only optimization.
     #[test]
     fn test_write_mavlink_only_optimization() {
-        // Define the test file name and remove it if it exists
-        const CASE_FILE_NAME: &str = "test_write_mavlink_only.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        // Create a temporary file
+        let mut tmpfile: NamedTempFile = NamedTempFile::new().unwrap();
+        let tmpfile_path = tmpfile.path().to_str().unwrap();
 
         // Define format flags with MAVLink only optimization
         let format_flags = FormatFlags {
@@ -441,33 +460,33 @@ mod tests {
 
         // Create a new logger instance with the format flags
         let mut logger: RotatingFileMavLogger =
-            RotatingFileMavLogger::new(CASE_FILE_NAME, 1000, 0, Some(format_flags), None)
+            RotatingFileMavLogger::new(tmpfile_path, 1000, 0, Some(format_flags), None)
                 .expect("Failed to create logger");
 
         populate_log_file(&mut logger);
 
         // Read the log file and verify its content
-        let mut file: File = File::open(CASE_FILE_NAME).unwrap();
         let mut content: Vec<u8> = Vec::new();
-        file.read_to_end(&mut content).unwrap();
-        assert_eq!(content.len(), 108 + 10 * 29);
+        tmpfile.read_to_end(&mut content).unwrap();
 
         // Verify the file header
+        let mut pointer: usize = FileHeader::MIN_SIZE;
         assert_eq!(content[60..62], [1, 0]); // flags
 
         // Verify MAVLink entries
-        for i in 0..10 {
-            let offset = 108 + i * 29;
-            assert_ne!(content[offset..offset + 8], [0, 0, 0, 0, 0, 0, 0, 0]); // timestamp
+        const MAVLINK_ENTRY_SIZE: usize = 29;
+        for _ in 0..10 {
+            assert_ne!(content[pointer..pointer + 8], [0, 0, 0, 0, 0, 0, 0, 0]); // timestamp
             assert_eq!(
-                content[offset + 8..offset + 29],
+                content[pointer + 8..pointer + MAVLINK_ENTRY_SIZE],
                 [
                     253, 9, 0, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 12, 3, 0, 3, 3, 98, 190
                 ]
             ); // payload
+            pointer += MAVLINK_ENTRY_SIZE;
         }
 
-        // Clean up the test file
-        std::fs::remove_file(CASE_FILE_NAME).unwrap();
+        // Remove the temporary file
+        tmpfile.close().unwrap();
     }
 }

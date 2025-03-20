@@ -154,6 +154,8 @@ pub struct FileHeader {
 }
 
 impl FileHeader {
+    /// Minimum size of the file header in bytes. Can be more if message definitions are included.
+    pub const MIN_SIZE: usize = 108;
     /// Currently supported file format version.
     pub const FILE_FORMAT_VERSION: u32 = 1;
     /// Default source application ID.
