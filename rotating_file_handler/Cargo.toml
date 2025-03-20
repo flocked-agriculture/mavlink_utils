@@ -1,0 +1,10 @@
+[package]
+name = "rotating_file_handler"
+version = "0.1.0"
+edition = "2024"
+authors = ["Wesley Murray"]
+description = "Implements a rotating file handler."
+repository = "https://github.com/flocked-agriculture/mavlink_utils"
+license = "MIT/Apache-2.0"
+
+[dependencies]
