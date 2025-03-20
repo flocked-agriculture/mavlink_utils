@@ -1,30 +1,31 @@
 #[cfg(feature = "MavLog")]
 #[cfg(test)]
 mod mav_parse_tests {
+    use std::io::Write;
+
     use mavlink::common::{
-        ATTITUDE_DATA, GPS2_RAW_DATA, GpsFixType, HEARTBEAT_DATA, MavAutopilot, MavMessage,
-        MavModeFlag, MavState, MavType,
+        GpsFixType, MavAutopilot, MavMessage, MavModeFlag, MavState, MavType, ATTITUDE_DATA,
+        GPS2_RAW_DATA, HEARTBEAT_DATA,
     };
     use mavlink::{MAVLinkV2MessageRaw, MavHeader};
-    use mavlink_log_parser::MavParser;
     use mavlink_log_parser::mav_parser::MavLogParser;
+    use mavlink_log_parser::MavParser;
+    use tempfile;
 
     #[test]
     #[should_panic(expected = "Failed to read file header.")]
     fn test_mav_log_parser_file_to_small_for_header() {
         // not enough data for header
-        const CASE_FILE_NAME: &str = "/tmp/test_mav_log_parser_file_to_small_for_header.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
-        std::fs::write(CASE_FILE_NAME, &[0u8]).expect("Failed to write test file");
-        MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(CASE_FILE_NAME);
+        let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
+        temp_file.write(&[0u8]).expect("Failed to write test file");
+        MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(temp_file.path().to_str().unwrap());
     }
 
     #[test]
     #[should_panic(expected = "Unsupported file format version.")]
     fn test_mav_log_parser_file_invalid_file_version() {
         // not enough data for header
-        const CASE_FILE_NAME: &str = "/tmp/test_mav_log_parser_file_invalid_file_version.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
         let packed_data: [u8; 108] = [
             // file header
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, // uuid
@@ -42,17 +43,18 @@ mod mav_parse_tests {
             0, 0, 0, 0, // size
         ];
 
-        std::fs::write(CASE_FILE_NAME, &packed_data).expect("Failed to write test file");
+        temp_file
+            .write(&packed_data)
+            .expect("Failed to write test file");
 
-        MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(CASE_FILE_NAME);
+        MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(temp_file.path().to_str().unwrap());
     }
 
     #[test]
     #[should_panic(expected = "Unsupported MAVLink version.")]
     fn test_mav_log_parser_file_invalid_mav_version() {
         // not enough data for header
-        const CASE_FILE_NAME: &str = "/tmp/test_mav_log_parser_file_invalid_mav_version.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
         let packed_data: [u8; 108] = [
             // file header
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, // uuid
@@ -70,18 +72,17 @@ mod mav_parse_tests {
             0, 0, 0, 0, // size
         ];
 
-        std::fs::write(CASE_FILE_NAME, &packed_data).expect("Failed to write test file");
+        temp_file
+            .write(&packed_data)
+            .expect("Failed to write test file");
 
-        MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(CASE_FILE_NAME);
+        MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(temp_file.path().to_str().unwrap());
     }
 
     #[test]
     #[should_panic(expected = "Custom XML files for message definitions are not supported.")]
     fn test_mav_log_parser_file_unsupported_payload_type_urls() {
-        // not enough data for header
-        const CASE_FILE_NAME: &str =
-            "/tmp/test_mav_log_parser_file_unsupported_payload_type_urls.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
         let packed_data: [u8; 108] = [
             // file header
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, // uuid
@@ -99,18 +100,17 @@ mod mav_parse_tests {
             0, 0, 0, 0, // size
         ];
 
-        std::fs::write(CASE_FILE_NAME, &packed_data).expect("Failed to write test file");
+        temp_file
+            .write(&packed_data)
+            .expect("Failed to write test file");
 
-        MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(CASE_FILE_NAME);
+        MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(temp_file.path().to_str().unwrap());
     }
 
     #[test]
     #[should_panic(expected = "XML for message definitions is not supported.")]
     fn test_mav_log_parser_file_unsupported_payload_type_xml() {
-        // not enough data for header
-        const CASE_FILE_NAME: &str =
-            "/tmp/test_mav_log_parser_file_unsupported_payload_type_xml.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
         let packed_data: [u8; 108] = [
             // file header
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, // uuid
@@ -128,18 +128,17 @@ mod mav_parse_tests {
             0, 0, 0, 0, // size
         ];
 
-        std::fs::write(CASE_FILE_NAME, &packed_data).expect("Failed to write test file");
+        temp_file
+            .write(&packed_data)
+            .expect("Failed to write test file");
 
-        MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(CASE_FILE_NAME);
+        MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(temp_file.path().to_str().unwrap());
     }
 
     #[test]
     #[should_panic(expected = "Failed to read message definitions.")]
     fn test_mav_log_parser_failed_to_unpack_message_definitions() {
-        // not enough data for header
-        const CASE_FILE_NAME: &str =
-            "/tmp/test_mav_log_parser_failed_to_unpack_message_definitions.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
         let packed_data: [u8; 108] = [
             // file header
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, // uuid
@@ -157,17 +156,16 @@ mod mav_parse_tests {
             10, 0, 0, 0, // size
         ];
 
-        std::fs::write(CASE_FILE_NAME, &packed_data).expect("Failed to write test file");
+        temp_file
+            .write(&packed_data)
+            .expect("Failed to write test file");
 
-        MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(CASE_FILE_NAME);
+        MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(temp_file.path().to_str().unwrap());
     }
 
     #[test]
     fn test_mav_log_parser_sub_parser_mavlink_only_no_timestamp() {
-        // not enough data for header
-        const CASE_FILE_NAME: &str =
-            "/tmp/test_mav_log_parser_failed_to_unpack_message_definitions.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
         let mut packed_data: Vec<u8> = vec![
             // file header
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, // uuid
@@ -186,9 +184,13 @@ mod mav_parse_tests {
         ];
         populate_data(true, false, &mut packed_data);
 
-        std::fs::write(CASE_FILE_NAME, &packed_data).expect("Failed to write test file");
+        temp_file
+            .write(&packed_data)
+            .expect("Failed to write test file");
 
-        let mut parser = MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(CASE_FILE_NAME);
+        let mut parser = MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(
+            temp_file.path().to_str().unwrap(),
+        );
         for i in 0..60 {
             let entry = parser.next();
             assert!(entry.is_ok(), "{i} {:?}", entry.err());
@@ -197,15 +199,11 @@ mod mav_parse_tests {
             assert!(entry.mav_header.is_some());
             assert!(entry.mav_message.is_some());
         }
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
     }
 
     #[test]
     fn test_mav_log_parser_sub_parser_mavlink_only_and_timestamp() {
-        // not enough data for header
-        const CASE_FILE_NAME: &str =
-            "/tmp/test_mav_log_parser_failed_to_unpack_message_definitions.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
         let mut packed_data: Vec<u8> = vec![
             // file header
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, // uuid
@@ -224,9 +222,13 @@ mod mav_parse_tests {
         ];
         populate_data(true, true, &mut packed_data);
 
-        std::fs::write(CASE_FILE_NAME, &packed_data).expect("Failed to write test file");
+        temp_file
+            .write(&packed_data)
+            .expect("Failed to write test file");
 
-        let mut parser = MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(CASE_FILE_NAME);
+        let mut parser = MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(
+            temp_file.path().to_str().unwrap(),
+        );
         for i in 0..60 {
             let entry = parser.next();
             assert!(entry.is_ok(), "Iteration: {i} {:?}", entry.err());
@@ -236,14 +238,12 @@ mod mav_parse_tests {
             assert!(entry.mav_header.is_some());
             assert!(entry.mav_message.is_some());
         }
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        temp_file.close().unwrap();
     }
 
     #[test]
     fn test_mav_log_parser_sub_parser_mixed_and_timestamp() {
-        // not enough data for header
-        const CASE_FILE_NAME: &str = "/tmp/test_mav_log_parser_sub_parser_mixed_and_timestamp.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
         let mut packed_data: Vec<u8> = vec![
             // file header
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, // uuid
@@ -262,11 +262,15 @@ mod mav_parse_tests {
         ];
         populate_data(false, true, &mut packed_data);
 
-        std::fs::write(CASE_FILE_NAME, &packed_data).expect("Failed to write test file");
+        temp_file
+            .write(&packed_data)
+            .expect("Failed to write test file");
 
         println!("Len of packed_data: {}", packed_data.len());
 
-        let mut parser = MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(CASE_FILE_NAME);
+        let mut parser = MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(
+            temp_file.path().to_str().unwrap(),
+        );
         for i in 0..20 {
             // handle raw entry
             let entry = parser.next();
@@ -308,13 +312,12 @@ mod mav_parse_tests {
                 assert!(entry.mav_message.is_some());
             }
         }
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        temp_file.close().unwrap();
     }
 
     #[test]
     fn test_mav_log_parser_sub_parser_mavlink_only_and_timestamp_handle_missing_timestamp() {
-        const CASE_FILE_NAME: &str = "/tmp/test_mav_log_parser_sub_parser_mavlink_only_and_timestamp_handle_missing_timestamp.mav";
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        let mut temp_file = tempfile::NamedTempFile::new().expect("Failed to create temp file");
         let mut packed_data: Vec<u8> = vec![
             // file header
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, // uuid
@@ -336,10 +339,13 @@ mod mav_parse_tests {
         // Remove the timestamp data from packed_data
         packed_data.drain(108..116);
 
-        // Rewrite the modified data to the file
-        std::fs::write(CASE_FILE_NAME, &packed_data).expect("Failed to write modified test file");
+        temp_file
+            .write(&packed_data)
+            .expect("Failed to write modified test file");
 
-        let mut parser = MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(CASE_FILE_NAME);
+        let mut parser = MavLogParser::<mavlink::ardupilotmega::MavMessage>::new(
+            temp_file.path().to_str().unwrap(),
+        );
 
         // Check the first iteration
         let first_entry = parser.next();
@@ -368,7 +374,7 @@ mod mav_parse_tests {
             assert!(entry.mav_header.is_some());
             assert!(entry.mav_message.is_some());
         }
-        std::fs::remove_file(CASE_FILE_NAME).unwrap_or_else(|_| {});
+        temp_file.close().unwrap();
     }
 
     fn populate_data(mavlink_only: bool, timestamp: bool, data: &mut Vec<u8>) {
@@ -482,7 +488,8 @@ mod mav_parse_tests {
             data.extend_from_slice(&time.to_le_bytes()); // timestamp
         }
         if !mavlink_only {
-            data.extend_from_slice(&(msg.raw_bytes().len() as u16).to_le_bytes()); // size
+            data.extend_from_slice(&(msg.raw_bytes().len() as u16).to_le_bytes());
+            // size
         }
         data.extend_from_slice(&msg.raw_bytes()); // payload
     }

@@ -5,8 +5,8 @@ use uuid::Uuid;
 
 /// Struct representing format flags for the log file.
 ///
-/// `FormatFlags` contains options that modify the format of the log file.
-/// - `mavlink_only`: If set, only MAVLink messages are logged allowing for a more compact log file.
+/// `FormatFlags` contains options that modify the format of the log file:
+/// - `mavlink_only`: If set, only MAVLink messages are logged, allowing for a more compact log file.
 /// - `not_timestamped`: If set, timestamps per entry are not included in the log file.
 pub struct FormatFlags {
     /// If set, only MAVLink messages are logged allowing for a more compact log file.
@@ -16,6 +16,13 @@ pub struct FormatFlags {
 }
 
 impl FormatFlags {
+    /// Unpacks a 16-bit integer into a `FormatFlags` struct.
+    ///
+    /// # Arguments
+    /// - `packed_data`: A 16-bit integer representing the format flags.
+    ///
+    /// # Returns
+    /// A `FormatFlags` struct with the corresponding flags set.
     pub fn unpack(packed_data: u16) -> Self {
         FormatFlags {
             mavlink_only: packed_data & 0x01 != 0,
@@ -26,9 +33,9 @@ impl FormatFlags {
 
 /// Enum representing the payload type for MAVLink message definitions.
 ///
-/// `MavlinkDefinitionPayloadType` specifies the type of payload used to identify message definitions.
+/// `MavlinkDefinitionPayloadType` specifies the type of payload used to identify message definitions:
 /// - `None`: No payload. Use MAVLink main XML definition as default.
-/// - `Utf8CommaDelimitedUrlsForXMLFiles`: UTF-8 encoded comma delimited URLs for XML files.
+/// - `Utf8SpaceDelimitedUrlsForXMLFiles`: UTF-8 encoded space-delimited URLs for XML files.
 /// - `Utf8Xml`: UTF-8 encoded XML.
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum MavlinkDefinitionPayloadType {
@@ -43,6 +50,13 @@ pub enum MavlinkDefinitionPayloadType {
 impl TryFrom<u16> for MavlinkDefinitionPayloadType {
     type Error = ();
 
+    /// Converts a 16-bit integer into a `MavlinkDefinitionPayloadType`.
+    ///
+    /// # Arguments
+    /// - `value`: A 16-bit integer representing the payload type.
+    ///
+    /// # Returns
+    /// A `MavlinkDefinitionPayloadType` enum variant, or an error if the value is invalid.
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(MavlinkDefinitionPayloadType::None),
@@ -59,8 +73,10 @@ impl TryFrom<u16> for MavlinkDefinitionPayloadType {
 pub struct MavlinkMessageDefinition {
     /// MAVLink protocol major version number.
     pub version_major: u32,
+    #[allow(dead_code)]
     /// MAVLink protocol minor version number.
     pub version_minor: u32,
+    #[allow(dead_code)]
     /// String identifying mavlink dialect.
     pub dialect: String,
     /// Type of payload used to identify message definition.
@@ -72,6 +88,13 @@ pub struct MavlinkMessageDefinition {
 }
 
 impl MavlinkMessageDefinition {
+    /// Unpacks a fixed-size byte array into a `MavlinkMessageDefinition` struct.
+    ///
+    /// # Arguments
+    /// - `packed_data`: A fixed-size byte array containing the packed message definition.
+    ///
+    /// # Returns
+    /// A `MavlinkMessageDefinition` struct with the unpacked data.
     pub fn unpack(packed_data: &[u8; 46]) -> Self {
         // stop at the first null byte when unpacking a string
         let end_dialect_ind: usize = match packed_data[8..40].iter().position(|&x| x == 0) {
@@ -90,6 +113,10 @@ impl MavlinkMessageDefinition {
         }
     }
 
+    /// Unpacks the payload for the message definition.
+    ///
+    /// # Arguments
+    /// - `packed_data`: A byte slice containing the packed payload data.
     pub fn unpack_payload(&mut self, packed_data: &[u8]) {
         match self.payload_type {
             MavlinkDefinitionPayloadType::Utf8SpaceDelimitedUrlsForXMLFiles => {
@@ -108,10 +135,13 @@ impl MavlinkMessageDefinition {
 /// `FileHeader` contains metadata about the log file, including a unique identifier, timestamp, source application ID,
 /// format version, format flags, and message definitions.
 pub struct FileHeader {
+    #[allow(dead_code)]
     /// Unique id for log file. It is expected the uuid library will be used to generate this.
     pub uuid: Uuid,
+    #[allow(dead_code)]
     /// The system unix timestamp in microseconds when the logger was initialized.
     pub timestamp_us: u64,
+    #[allow(dead_code)]
     /// String identifying the application used to generate the log file.
     pub src_application_id: String,
     /// A format version number. This is to allow compatability detection for future changes to the log file format.
@@ -123,6 +153,13 @@ pub struct FileHeader {
 }
 
 impl FileHeader {
+    /// Unpacks a fixed-size byte array into a `FileHeader` struct.
+    ///
+    /// # Arguments
+    /// - `packed_data`: A fixed-size byte array containing the packed file header.
+    ///
+    /// # Returns
+    /// A `FileHeader` struct with the unpacked data.
     pub fn unpack(packed_data: &[u8; 108]) -> Self {
         let id_end: usize = match packed_data[24..56].iter().position(|&x| x == 0) {
             Some(index) => index + 24,
@@ -149,10 +186,15 @@ impl FileHeader {
 }
 
 #[cfg(test)]
+/// Unit tests for the `header` module.
+///
+/// This module contains tests for the functionality provided by the `header` module,
+/// including unpacking format flags, MAVLink message definitions, and file headers.
 mod tests {
     use super::*;
 
     #[test]
+    /// Tests the `unpack` method of `FormatFlags` to ensure it correctly extracts flags from a 16-bit integer.
     fn test_format_flags_unpack() {
         let packed_data: u16 = 0b11;
         let flags = FormatFlags::unpack(packed_data);
@@ -176,6 +218,8 @@ mod tests {
     }
 
     #[test]
+    /// Tests the `try_from` implementation for `MavlinkDefinitionPayloadType` to ensure it correctly converts
+    /// valid 16-bit integers into the corresponding enum variants and returns an error for invalid values.
     fn test_mavlink_definition_payload_type_try_from() {
         assert_eq!(
             MavlinkDefinitionPayloadType::try_from(0).unwrap(),
@@ -193,6 +237,8 @@ mod tests {
     }
 
     #[test]
+    /// Tests the `unpack` method of `MavlinkMessageDefinition` to ensure it correctly extracts message definition
+    /// data from a fixed-size byte array and handles payload unpacking properly.
     fn test_mavlink_message_definition_unpack() {
         let packed_data: [u8; 46] = [
             1, 0, 0, 0, // version_major
@@ -236,6 +282,8 @@ mod tests {
     }
 
     #[test]
+    /// Tests the `unpack` method of `FileHeader` to ensure it correctly extracts file header data from a fixed-size
+    /// byte array, including UUID, timestamp, application ID, format flags, and message definitions.
     fn test_file_header_unpack() {
         let packed_data: [u8; 108] = [
             // file header
