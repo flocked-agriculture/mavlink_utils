@@ -259,7 +259,7 @@ impl<M: Message + 'static> MavLogParser<M> {
         let mav_version = Self::determine_mavlink_version(&header);
 
         let parser: Box<dyn MavParser<M = M>> = if header.format_flags.mavlink_only {
-            if header.format_flags.not_timestamped {
+            if header.format_flags.no_timestamp {
                 Box::new(MavlinkOnlyNoTimestampParser {
                     reader,
                     mav_version,
@@ -274,7 +274,7 @@ impl<M: Message + 'static> MavLogParser<M> {
             }
         } else {
             Box::new(MixedParser {
-                timestamped: !header.format_flags.not_timestamped,
+                timestamped: !header.format_flags.no_timestamp,
                 reader,
                 mav_version,
                 _phantom: std::marker::PhantomData,

@@ -6,22 +6,22 @@ use uuid::Uuid;
 ///
 /// `FormatFlags` contains options that modify the format of the log file.
 /// - `mavlink_only`: If set, only MAVLink messages are logged allowing for a more compact log file.
-/// - `not_timestamped`: If set, timestamps per entry are not included in the log file.
+/// - `no_timestamp`: If set, timestamps per entry are not included in the log file.
 pub struct FormatFlags {
     /// If set, only MAVLink messages are logged allowing for a more compact log file.
     pub mavlink_only: bool,
     /// If set, timestamps per entry are not included in the log file.
-    pub not_timestamped: bool,
+    pub no_timestamp: bool,
 }
 
 impl Default for FormatFlags {
     /// Provides default values for `FormatFlags`.
     ///
-    /// By default, both `mavlink_only` and `not_timestamped` are set to `false`.
+    /// By default, both `mavlink_only` and `no_timestamp` are set to `false`.
     fn default() -> Self {
         FormatFlags {
             mavlink_only: false,
-            not_timestamped: false,
+            no_timestamp: false,
         }
     }
 }
@@ -34,7 +34,7 @@ impl FormatFlags {
     /// # Returns
     /// A `[u8; 2]` array containing the packed representation of the `FormatFlags`.
     pub fn pack(&self) -> [u8; 2] {
-        let flags: u16 = (self.mavlink_only as u16) | ((self.not_timestamped as u16) << 1);
+        let flags: u16 = (self.mavlink_only as u16) | ((self.no_timestamp as u16) << 1);
         flags.to_le_bytes()
     }
 }
@@ -248,30 +248,30 @@ mod tests {
     ///
     /// This test verifies that the `pack` method correctly converts the `FormatFlags`
     /// struct into a 2-byte array representation. It checks various combinations of
-    /// the `mavlink_only` and `not_timestamped` flags to ensure the correct bit
+    /// the `mavlink_only` and `no_timestamp` flags to ensure the correct bit
     /// representation in the packed array.
     fn test_format_flags_pack() {
         let flags = FormatFlags {
             mavlink_only: false,
-            not_timestamped: false,
+            no_timestamp: false,
         };
         assert_eq!(flags.pack(), [0, 0]);
 
         let flags = FormatFlags {
             mavlink_only: true,
-            not_timestamped: false,
+            no_timestamp: false,
         };
         assert_eq!(flags.pack(), [1, 0]);
 
         let flags = FormatFlags {
             mavlink_only: false,
-            not_timestamped: true,
+            no_timestamp: true,
         };
         assert_eq!(flags.pack(), [2, 0]);
 
         let flags = FormatFlags {
             mavlink_only: true,
-            not_timestamped: true,
+            no_timestamp: true,
         };
         assert_eq!(flags.pack(), [3, 0]);
     }
@@ -339,7 +339,7 @@ mod tests {
     fn test_file_header_pack() {
         let format_flags = FormatFlags {
             mavlink_only: true,
-            not_timestamped: false,
+            no_timestamp: false,
         };
         let message_definition = MavlinkMessageDefinition {
             version_major: 2,

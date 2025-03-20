@@ -7,12 +7,12 @@ use uuid::Uuid;
 ///
 /// `FormatFlags` contains options that modify the format of the log file:
 /// - `mavlink_only`: If set, only MAVLink messages are logged, allowing for a more compact log file.
-/// - `not_timestamped`: If set, timestamps per entry are not included in the log file.
+/// - `no_timestamp`: If set, timestamps per entry are not included in the log file.
 pub struct FormatFlags {
     /// If set, only MAVLink messages are logged allowing for a more compact log file.
     pub mavlink_only: bool,
     /// If set, timestamps per entry are not included in the log file.
-    pub not_timestamped: bool,
+    pub no_timestamp: bool,
 }
 
 impl FormatFlags {
@@ -26,7 +26,7 @@ impl FormatFlags {
     pub fn unpack(packed_data: u16) -> Self {
         FormatFlags {
             mavlink_only: packed_data & 0x01 != 0,
-            not_timestamped: packed_data & 0x02 != 0,
+            no_timestamp: packed_data & 0x02 != 0,
         }
     }
 }
@@ -199,22 +199,22 @@ mod tests {
         let packed_data: u16 = 0b11;
         let flags = FormatFlags::unpack(packed_data);
         assert!(flags.mavlink_only);
-        assert!(flags.not_timestamped);
+        assert!(flags.no_timestamp);
 
         let packed_data: u16 = 0b01;
         let flags = FormatFlags::unpack(packed_data);
         assert!(flags.mavlink_only);
-        assert!(!flags.not_timestamped);
+        assert!(!flags.no_timestamp);
 
         let packed_data: u16 = 0b10;
         let flags = FormatFlags::unpack(packed_data);
         assert!(!flags.mavlink_only);
-        assert!(flags.not_timestamped);
+        assert!(flags.no_timestamp);
 
         let packed_data: u16 = 0b00;
         let flags = FormatFlags::unpack(packed_data);
         assert!(!flags.mavlink_only);
-        assert!(!flags.not_timestamped);
+        assert!(!flags.no_timestamp);
     }
 
     #[test]
@@ -310,7 +310,7 @@ mod tests {
         assert_eq!(header.src_application_id, "app");
         assert_eq!(header.format_version, 0x02000001);
         assert!(header.format_flags.mavlink_only);
-        assert!(header.format_flags.not_timestamped);
+        assert!(header.format_flags.no_timestamp);
         assert_eq!(header.message_definition.version_major, 0x05000004);
         assert_eq!(header.message_definition.version_minor, 0x07000006);
         assert_eq!(header.message_definition.dialect, "test");
