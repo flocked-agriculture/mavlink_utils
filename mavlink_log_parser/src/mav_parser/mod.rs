@@ -41,6 +41,10 @@ impl<M: Message> MavParser for MavlinkOnlyNoTimestampParser<M> {
 
     fn next(&mut self) -> Result<LogEntry<M>, MessageReadError> {
         let mut entry: LogEntry<M> = LogEntry::default();
+        // NOTE: the read_versioned_msg function will do a blocking search for the next valid mavlink packet if
+        // it tries to unpack the current data and gets something unexpected. Since this is a mavlink only file with
+        // no timestamps, we can safely allow this to happen. The Mavlink infrastructure has a lot of hours and false
+        // positives in the magic number search do not seem like a problem with Mavlink only data streams.
         let (header, message) = read_versioned_msg::<M, File>(&mut self.reader, self.mav_version)?;
         entry.mav_header = Some(header);
         entry.mav_message = Some(message);
@@ -63,13 +67,16 @@ impl<M: Message> MavParser for TimestampedMavlinkOnlyParser<M> {
             MavlinkVersion::V1 => mavlink::MAV_STX,
             MavlinkVersion::V2 => mavlink::MAV_STX_V2,
         };
-        if self.reader.peek_exact(5)?[4] == magic_number {
+        if self.reader.peek_exact(9)?[8] == magic_number {
             let timestamp_raw: &[u8] = self.reader.read_exact(8)?;
             entry.timestamp = match timestamp_raw.try_into() {
                 Ok(bytes) => Some(u64::from_le_bytes(bytes)),
                 Err(_) => None,
             };
         }
+        // TODO: this will silently fail and try to get next mavlink message on data corruption
+        // this is a concern that some messages could be associated with the wrong timestamp
+        // we need a version of this to fail immediately on any parsing issue
         let (header, message) = read_versioned_msg::<M, File>(&mut self.reader, self.mav_version)?;
         entry.mav_header = Some(header);
         entry.mav_message = Some(message);
@@ -80,6 +87,7 @@ impl<M: Message> MavParser for TimestampedMavlinkOnlyParser<M> {
 pub struct MixedParser<M: Message> {
     timestamped: bool,
     reader: PeekReader<File>,
+    mav_version: MavlinkVersion,
     _phantom: std::marker::PhantomData<M>,
 }
 
@@ -105,17 +113,24 @@ impl<M: Message> MavParser for MixedParser<M> {
                 .try_into()
                 .expect("Failed to read log entry payload size."),
         );
-        let payload = self.reader.read_exact(payload_size as usize)?;
         match entry_type {
-            EntryType::Raw => entry.raw = Some(payload.to_vec()),
+            EntryType::Raw => {
+                let payload = self.reader.read_exact(payload_size as usize)?;
+                entry.raw = Some(payload.to_vec())
+            }
             EntryType::Mavlink => {
+                // TODO: this will silently fail and try to get next mavlink message on data corruption
+                // this is a concern that some messages could be associated with the wrong timestamp
+                // or non mavlink entries could get skipped
+                // we need a version of this to fail immediately on any parsing issue
                 let (header, message) =
-                    read_versioned_msg::<M, File>(&mut self.reader, MavlinkVersion::V1)?;
+                    read_versioned_msg::<M, File>(&mut self.reader, self.mav_version)?;
                 entry.mav_header = Some(header);
                 entry.mav_message = Some(message);
                 return Ok(entry);
             }
             EntryType::Utf8Text => {
+                let payload = self.reader.read_exact(payload_size as usize)?;
                 entry.text = match String::from_utf8(payload.to_vec()) {
                     Ok(text) => Some(text),
                     Err(_) => {
@@ -162,6 +177,7 @@ impl<M: Message + 'static> MavLogParser<M> {
             Box::new(MixedParser {
                 timestamped: !header.format_flags.not_timestamped,
                 reader,
+                mav_version,
                 _phantom: std::marker::PhantomData,
             })
         };
@@ -176,10 +192,14 @@ impl<M: Message + 'static> MavLogParser<M> {
             .try_into()
             .expect("Failed to read file header.");
         let mut header = FileHeader::unpack(&header_bytes);
-        let definitions_raw: &[u8] = reader
-            .read_exact(header.message_definition.size as usize)
-            .expect("Failed to read message definitions.");
-        header.message_definition.unpack_payload(definitions_raw);
+        if header.message_definition.payload_type != MavlinkDefinitionPayloadType::None {
+            let definitions_raw: &[u8] = reader
+                .read_exact(header.message_definition.size as usize)
+                .expect("Failed to read message definitions.");
+            header.message_definition.unpack_payload(definitions_raw);
+        } else {
+            header.message_definition.size = 0;
+        }
 
         match header.message_definition.payload_type {
             MavlinkDefinitionPayloadType::None => {}
