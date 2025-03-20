@@ -1,0 +1,24 @@
+[package]
+name = "mavlink_log_parser"
+version = "0.1.0"
+edition = "2024"
+authors = [
+    "Wesley Murray",
+]
+description = "Implements a simple mavlink log parser."
+repository = "https://github.com/flocked-agriculture/mavlink_utils"
+readme ="./README.md"
+license = "MIT/Apache-2.0"
+
+[dependencies]
+uuid = { version = "1.15.1", features = ["v4"], optional = true }
+mavlink = { git = "https://github.com/flocked-agriculture/rust-mavlink", branch = "wm/dispersion_device" }
+
+[features]
+Tlog = ["mavlink/default"]
+MavLog = ["mavlink/default", "uuid/v4"]
+default = ["MavLog"]
+all = ["MavLog", "Tlog"]
+
+[dev-dependencies]
+tempfile = "3.19.1"

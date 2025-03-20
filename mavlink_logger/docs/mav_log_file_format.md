@@ -32,10 +32,10 @@ It is expected that endianness match the mavlink spec for [pack format](https://
 
 This is a bitmask meaning each entry should double the previous.
 
-| Value | Name            | Description                                                     |
-| :---- | :-------------- | :-------------------------------------------------------------- |
-| 1     | MAVLINK_ONLY    | Flag indicating this file only contains packed mavlink content. |
-| 2     | NOT_TIMESTAMPED | Flag indicating each entity has a timestamp                     |
+| Value | Name         | Description                                                     |
+| :---- | :----------- | :-------------------------------------------------------------- |
+| 1     | MAVLINK_ONLY | Flag indicating this file only contains packed mavlink content. |
+| 2     | NO_TIMESTAMP | Flag indicating each entity has a timestamp                     |
 
 ## Mavlink Message Definitions (46 bytes without payload)
 
@@ -62,12 +62,12 @@ This determines what information will be provided in the payload field for the M
 
 As many entries as there are room to write can be appended to the file content post mavlink definitions. Each entry could have up to the following structure. Each field in the following structure is optional as determined by the flags listed above.
 
-| Field        | C Type   | Description                                                                                                                                       |
-| :----------- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------ |
-| type         | uint8_t  | This indicates the payload type. See [Entry Type](#entry-type-enum) below. This field is NOT present if the MAVLINK_ONLY flag is set.             |
-| timestamp_us | uint64_t | Unix timestamp in microseconds for which this corresponding payload was acted upon. This field is NOT present if the NOT_TIMESTAMPED flag is set. |
-| size         | uint16_t | Size of the entry in bytes without the header. This field is NOT present if the MAVLINK_ONLY flag is set.                                         |
-| payload      | N/A      | Any bytes content.                                                                                                                                |
+| Field        | C Type   | Description                                                                                                                                    |
+| :----------- | :------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
+| type         | uint8_t  | This indicates the payload type. See [Entry Type](#entry-type-enum) below. This field is NOT present if the MAVLINK_ONLY flag is set.          |
+| timestamp_us | uint64_t | Unix timestamp in microseconds for which this corresponding payload was acted upon. This field is NOT present if the NO_TIMESTAMP flag is set. |
+| size         | uint16_t | Size of the entry in bytes without the header. This field is NOT present if the MAVLINK_ONLY flag is set.                                      |
+| payload      | N/A      | Any bytes content.                                                                                                                             |
 
 ### Entry Type Enum
 

@@ -154,7 +154,7 @@ impl RotatingFileMavLogger {
             // If mavlink only, there is no need to track the entry type
             record_bytes.extend_from_slice(&(entry_type as u8).to_le_bytes());
         }
-        if !self.header.format_flags.not_timestamped {
+        if !self.header.format_flags.no_timestamp {
             // If tracking log entry time, add the timestamp
             let timestamp_us: u64 = match self.time.elapsed() {
                 Ok(elapsed) => elapsed.as_micros() as u64,
@@ -355,7 +355,7 @@ mod tests {
 
         // Define format flags with no timestamp optimization
         let format_flags = FormatFlags {
-            not_timestamped: true,
+            no_timestamp: true,
             ..Default::default()
         };
 
