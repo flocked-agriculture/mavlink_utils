@@ -135,11 +135,31 @@ impl RotatingFileHandler {
 }
 
 impl Write for RotatingFileHandler {
+    /// Writes data to the log file.
+    ///
+    /// This method is part of the `Write` trait implementation. It writes the provided buffer
+    /// to the log file using the `emit` method. If the file size exceeds the maximum size,
+    /// it triggers a rotation of the log files.
+    ///
+    /// # Arguments
+    ///
+    /// * `buf` - The buffer containing the data to write.
+    ///
+    /// # Returns
+    ///
+    /// An `io::Result` containing the number of bytes written or an error.
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.emit(buf)?;
         Ok(buf.len())
     }
 
+    /// Flushes the log file.
+    ///
+    /// This method ensures that all buffered data is written to the log file.
+    ///
+    /// # Returns
+    ///
+    /// An `io::Result` indicating success or failure.
     fn flush(&mut self) -> io::Result<()> {
         self.file.flush()
     }
