@@ -12,7 +12,7 @@ license = "MIT/Apache-2.0"
 
 [dependencies]
 uuid = { version = "1.15.1", features = ["v4"], optional = true }
-rotating_file_handler = { path = "../rotating_file_handler", default-features = false }
+rotating_file_handler = { version = "0.2.0" }
 mavlink = { version = "0.13.1", default-features = false }
 
 [features]
