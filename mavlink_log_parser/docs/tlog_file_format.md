@@ -1,1 +1,0 @@
-../../mavlink_logger/docs/tlog_file_format.md
